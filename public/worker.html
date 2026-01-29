@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Pontaj Muncitor</title>
+  <style>
+    body { font-family: Arial, sans-serif; color:#000; background:#fff; margin:0; }
+    .wrap { max-width: 520px; margin: 30px auto; padding: 16px; }
+    .row { margin: 10px 0; }
+    button { width:100%; padding:12px; font-size:16px; margin: 8px 0; }
+    .msg { margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="row" id="hello"></div>
+
+    <button id="start">Start lucru</button>
+    <button id="breakStart">Pauză</button>
+    <button id="breakStop">Reia lucru</button>
+    <button id="stop">Stop zi</button>
+
+    <button id="logout">Logout</button>
+
+    <div class="msg" id="msg"></div>
+  </div>
+
+  <script type="module">
+    import { api, qs, setText } from "./client.js";
+
+    async function init() {
+      try {
+        const me = await api("/api/me");
+        setText("hello", `Salut, ${me.first_name} ${me.last_name}`);
+      } catch {
+        location.href = "/login.html";
+      }
+    }
+
+    qs("start").onclick = async () => {
+      try {
+        const r = await api("/api/worker/start", "POST");
+        setText("msg", `Start înregistrat: ${new Date(r.start_time).toLocaleString()}`);
+      } catch (e) { setText("msg", e.message); }
+    };
+
+    qs("breakStart").onclick = async () => {
+      try {
+        const r = await api("/api/worker/break/start", "POST");
+        setText("msg", `Pauză începută: ${new Date(r.break_start).toLocaleString()}`);
+      } catch (e) { setText("msg", e.message); }
+    };
+
+    qs("breakStop").onclick = async () => {
+      try {
+        const r = await api("/api/worker/break/stop", "POST");
+        setText("msg", `Pauză închisă, minute: ${r.break_minutes}`);
+      } catch (e) { setText("msg", e.message); }
+    };
+
+    qs("stop").onclick = async () => {
+      try {
+        const r = await api("/api/worker/stop", "POST");
+        setText("msg", `Stop, lucru: ${r.total_work_minutes} min, pauză: ${r.total_break_minutes} min`);
+      } catch (e) { setText("msg", e.message); }
+    };
+
+    qs("logout").onclick = async () => {
+      await api("/api/logout", "POST");
+      location.href = "/login.html";
+    };
+
+    init();
+  </script>
+</body>
+</html>

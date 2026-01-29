@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Login Pontaj</title>
+  <style>
+    body { font-family: Arial, sans-serif; color:#000; background:#fff; margin:0; }
+    .wrap { max-width: 420px; margin: 40px auto; padding: 16px; }
+    h1 { font-size: 22px; margin: 0 0 16px; }
+    label { display:block; margin: 12px 0 6px; }
+    input { width:100%; padding:10px; font-size:16px; box-sizing:border-box; }
+    button { width:100%; margin-top:16px; padding:12px; font-size:16px; }
+    .err { color:#b00020; margin-top:12px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Pontaj</h1>
+
+    <label>Nume</label>
+    <input id="first_name" />
+
+    <label>Prenume</label>
+    <input id="last_name" />
+
+    <label>Parolă</label>
+    <input id="password" type="password" />
+
+    <button id="btn">Login</button>
+    <div id="err" class="err"></div>
+  </div>
+
+  <script type="module">
+    import { api, qs, setText } from "./client.js";
+
+    qs("btn").addEventListener("click", async () => {
+      setText("err", "");
+      try {
+        const first_name = qs("first_name").value.trim();
+        const last_name = qs("last_name").value.trim();
+        const password = qs("password").value;
+
+        const r = await api("/api/login", "POST", { first_name, last_name, password });
+
+        if (r.role === "admin") location.href = "/admin.html";
+        else location.href = "/worker.html";
+
+      } catch (e) {
+        setText("err", e.message);
+      }
+    });
+  </script>
+</body>
+</html>

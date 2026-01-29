@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dashboard Pontaj</title>
+<style>
+body { font-family: Arial, sans-serif; margin:0; padding:20px; }
+h1 { font-size:20px; }
+h2 { font-size:16px; margin-top:20px; }
+table { border-collapse:collapse; width:100%; }
+th, td { border:1px solid #ddd; padding:8px; font-size:14px; }
+th { background:#f2f2f2; }
+input, button { padding:8px; font-size:14px; }
+.grid { display:grid; grid-template-columns:1fr 1fr 1fr auto; gap:8px; margin-bottom:10px; }
+.msg { margin:10px 0; }
+.row { display:flex; gap:8px; margin-bottom:10px; }
+</style>
+</head>
+<body>
+
+<h1>Dashboard Pontaj</h1>
+
+<div class="grid">
+  <input id="fn" placeholder="Nume muncitor">
+  <input id="ln" placeholder="Prenume muncitor">
+  <input id="pw" type="password" placeholder="Parolă">
+  <button id="addUser">Adaugă muncitor</button>
+</div>
+
+<div class="row">
+  <button id="refreshUsersBtn">Refresh utilizatori</button>
+  <button id="refreshShiftsBtn">Refresh pontaje</button>
+  <button id="logout">Logout</button>
+</div>
+
+<div id="msg" class="msg"></div>
+
+<h2>Utilizatori (<span id="usersCount">0</span>)</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Nume</th>
+<th>Prenume</th>
+<th>Rol</th>
+<th>Activ</th>
+<th>Acțiuni</th>
+</tr>
+</thead>
+<tbody id="usersBody"></tbody>
+</table>
+
+<h2>Pontaje</h2>
+<table>
+<thead>
+<tr>
+<th>Nume</th>
+<th>Prenume</th>
+<th>Start</th>
+<th>Stop</th>
+<th>Status</th>
+<th>Pauză</th>
+<th>Lucru</th>
+</tr>
+</thead>
+<tbody id="tbody"></tbody>
+</table>
+
+<script src="/socket.io/socket.io.js"></script>
+
+<script type="module">
+import { api, qs, setText } from "./client.js";
+
+function renderUsers(users) {
+  setText("usersCount", users.length);
+  const tb = qs("usersBody");
+  tb.innerHTML = "";
+  for (const u of users) {
+    const tr = document.createElement("tr");
+    const disabled = u.role === "admin" ? "disabled" : "";
+    tr.innerHTML = `
+      <td>${u.id}</td>
+      <td>${u.first_name}</td>
+      <td>${u.last_name}</td>
+      <td>${u.role}</td>
+      <td>${u.active ? "Da" : "Nu"}</td>
+      <td><button data-del-id="${u.id}" ${disabled}>Șterge</button></td>
+    `;
+    tb.appendChild(tr);
+  }
+}
+
+function renderShifts(rows) {
+  const tb = qs("tbody");
+  tb.innerHTML = "";
+  for (const r of rows) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${r.first_name}</td>
+      <td>${r.last_name}</td>
+      <td>${r.start}</td>
+      <td>${r.stop}</td>
+      <td>${r.status}</td>
+      <td>${r.break}</td>
+      <td>${r.work}</td>
+    `;
+    tb.appendChild(tr);
+  }
+}
+
+async function refreshUsers() {
+  const users = await api("/api/admin/users");
+  renderUsers(users);
+  setText("msg", "Utilizatori încărcați: " + users.length);
+}
+
+async function refreshShifts() {
+  const rows = await api("/api/admin/snapshot");
+  renderShifts(rows);
+}
+
+qs("usersBody").addEventListener("click", async (e) => {
+  const btn = e.target.closest("button[data-del-id]");
+  if (!btn) return;
+
+  const id = btn.getAttribute("data-del-id");
+  if (!confirm("Ștergi muncitorul?")) return;
+
+  try {
+    await api(`/api/admin/users/${id}/delete`, "POST");
+    await refreshUsers();
+    setText("msg", "Muncitor șters");
+  } catch (err) {
+    setText("msg", err.message);
+  }
+});
+
+async function init() {
+  try {
+    const me = await api("/api/me");
+    if (me.role !== "admin") location.href = "/worker.html";
+  } catch {
+    location.href = "/login.html";
+    return;
+  }
+
+  await refreshUsers();
+  await refreshShifts();
+
+  const socket = io();
+  socket.on("admin_snapshot", (rows) => renderShifts(rows));
+}
+
+qs("addUser").onclick = async () => {
+  setText("msg", "");
+  try {
+    const first_name = qs("fn").value.trim();
+    const last_name = qs("ln").value.trim();
+    const password = qs("pw").value;
+
+    const r = await api("/api/admin/users", "POST", { first_name, last_name, password });
+
+    qs("fn").value = "";
+    qs("ln").value = "";
+    qs("pw").value = "";
+
+    await refreshUsers();
+    setText("msg", "Muncitor adăugat, id " + r.id);
+  } catch (e) {
+    setText("msg", e.message);
+  }
+};
+
+qs("refreshUsersBtn").onclick = refreshUsers;
+qs("refreshShiftsBtn").onclick = refreshShifts;
+
+qs("logout").onclick = async () => {
+  await api("/api/logout", "POST");
+  location.href = "/login.html";
+};
+
+init();
+</script>
+
+</body>
+</html>
